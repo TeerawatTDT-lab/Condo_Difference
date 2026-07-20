@@ -1,0 +1,53 @@
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real Estate Dashboard</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --light: #ecf0f1; }
+        body { font-family: 'Sarabun', sans-serif; background-color: var(--light); margin: 0; padding: 20px; }
+        .dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .filter-panel { grid-column: span 4; display: flex; gap: 10px; }
+        .chart-container { grid-column: span 2; height: 400px; }
+        .table-container { grid-column: span 2; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        h1 { font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="filter-panel">
+            <select id="provFilter"><option>ทุกจังหวัด</option></select>
+            <select id="branchFilter"><option>ทุกสำนักงาน</option></select>
+            <select id="statusFilter"><option>ทุกสถานะ</option></select>
+        </div>
+        <div class="card"><h3>จำนวนอาคารชุด</h3><p id="totalCondo">0</p></div>
+        <div class="card"><h3>จำนวนการซื้อขาย</h3><p id="totalReg">0</p></div>
+        <div class="card"><h3>จำนวนห้อง</h3><p id="totalRoom">0</p></div>
+        <div class="card"><h3>อัตราการเปลี่ยนแปลง</h3><p id="avgDiff">0%</p></div>
+        <div class="card chart-container"><h3>แผนที่ประเทศไทย</h3><div id="map"></div></div>
+        <div class="card table-container"><h3>Top 10 Percent Diff</h3><table id="topTable"></table></div>
+        <div class="card" style="grid-column: span 4;"><h3>ตารางข้อมูลรวม</h3><table id="dataTable"></table></div>
+        <p>ช่วงเวลาวิเคราะห์: 1 มิถุนายน 2568 ถึง 31 พฤษภาคม 2569</p>
+    </div>
+    <script>
+        // Placeholder data loading - integrate with Google Sheets API in production
+        const data = [{"CHANGWAT_CODE":10,"PRI":"10030000;10\/2541","BRANCH":10030000,"REGIST_NO":"10\/2541","CHANGWAT_Name":"\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e\u0e21\u0e2b\u0e32\u0e19\u0e04\u0e23","BRANCH_Name":"\u0e2a\u0e33\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19\u0e17\u0e35\u0e48\u0e14\u0e34\u0e19\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e\u0e21\u0e2b\u0e32\u0e19\u0e04\u0e23 \u0e2a\u0e32\u0e02\u0e32\u0e1a\u0e32\u0e07\u0e01\u0e30\u0e1b\u0e34","CONDO_NAME":"\u0e1a\u0e49\u0e32\u0e19\u0e01\u0e24\u0e29\u0e01\u0e23","ALL_REG":1,"USE_REG":1,"ALL_ROOM":60,"STATUS":"\u0e19\u0e49\u0e2d\u0e22\u0e01\u0e27\u0e48\u0e32\u0e23\u0e49\u0e2d\u0e22\u0e25\u0e30 30","Percent_Diff":0.0,"Note":null},{"CHANGWAT_CODE":10,"PRI":"10080000;11\/2560","BRANCH":10080000,"REGIST_NO":"11\/2560","CHANGWAT_Name":"\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e\u0e21\u0e2b\u0e32\u0e19\u0e04\u0e23","BRANCH_Name":"\u0e2a\u0e33\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19\u0e17\u0e35\u0e48\u0e14\u0e34\u0e19\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e\u0e21\u0e2b\u0e32\u0e19\u0e04\u0e23 \u0e2a\u0e32\u0e02\u0e32\u0e2b\u0e49\u0e27\u0e22\u0e02\u0e27\u0e32\u0e07","CONDO_NAME":"\u0e40\u0e14\u0e2d\u0e30\u0e42\u0e21\u0e19\u0e39\u0e40\u0e21\u0e49\u0e19\u0e15\u0e4c\u0e2a\u0e19\u0e32\u0e21\u0e40\u0e1b\u0e49\u0e32","ALL_REG":1,"USE_REG":1,"ALL_ROOM":86,"STATUS":"\u0e19\u0e49\u0e2d\u0e22\u0e01\u0e27\u0e48\u0e32\u0e23\u0e49\u0e2d\u0e22\u0e25\u0e30 30","Percent_Diff":0.0,"Note":null},{"CHANGWAT_CODE":10,"PRI":"10020000;8\/2560","BRANCH":10020000,"REGIST_NO":"8\/2560","CHANGWAT_Name":"\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e\u0e21\u0e2b\u0e32\u0e19\u0e04\u0e23","BRANCH_Name":"\u0e2a\u0e33\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19\u0e17\u0e35\u0e48\u0e14\u0e34\u0e19\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e\u0e21\u0e2b\u0e32\u0e19\u0e04\u0e23 \u0e2a\u0e32\u0e02\u0e32\u0e1e\u0e23\u0e30\u0e42\u0e02\u0e19\u0e07","CONDO_NAME":"\u0e14\u0e34\u0e40\u0e2d\u0e47\u0e01\u0e40\u0e0b\u0e25\u0e1b\u0e32\u0e23\u0e4c\u0e04","ALL_REG":2,"USE_REG":2,"ALL_ROOM":104,"STATUS":"\u0e19\u0e49\u0e2d\u0e22\u0e01\u0e27\u0e48\u0e32\u0e23\u0e49\u0e2d\u0e22\u0e25\u0e30 30","Percent_Diff":0.0,"Note":null},{"CHANGWAT_CODE":10,"PRI":"10020000;4\/2535","BRANCH":10020000,"REGIST_NO":"4\/2535","CHANGWAT_Name":"\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e\u0e21\u0e2b\u0e32\u0e19\u0e04\u0e23","BRANCH_Name":"\u0e2a\u0e33\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19\u0e17\u0e35\u0e48\u0e14\u0e34\u0e19\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e\u0e21\u0e2b\u0e32\u0e19\u0e04\u0e23 \u0e2a\u0e32\u0e02\u0e32\u0e1e\u0e23\u0e30\u0e42\u0e02\u0e19\u0e07","CONDO_NAME":"\u0e1e\u0e35.\u0e40\u0e2d\u0e2a.\u0e17\u0e32\u0e27\u0e40\u0e27\u0e2d\u0e23\u0e4c","ALL_REG":1,"USE_REG":1,"ALL_ROOM":110,"STATUS":"\u0e19\u0e49\u0e2d\u0e22\u0e01\u0e27\u0e48\u0e32\u0e23\u0e49\u0e2d\u0e22\u0e25\u0e30 30","Percent_Diff":0.0,"Note":null},{"CHANGWAT_CODE":20,"PRI":"20020000;2\/2567","BRANCH":20020000,"REGIST_NO":"2\/2567","CHANGWAT_Name":"\u0e0a\u0e25\u0e1a\u0e38\u0e23\u0e35","BRANCH_Name":"\u0e2a\u0e33\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19\u0e17\u0e35\u0e48\u0e14\u0e34\u0e19\u0e08\u0e31\u0e07\u0e2b\u0e27\u0e31\u0e14\u0e0a\u0e25\u0e1a\u0e38\u0e23\u0e35 \u0e2a\u0e32\u0e02\u0e32\u0e28\u0e23\u0e35\u0e23\u0e32\u0e0a\u0e32","CONDO_NAME":"\u0e14\u0e35\u0e04\u0e2d\u0e19\u0e42\u0e14\u0e40\u0e27\u0e25","ALL_REG":290,"USE_REG":289,"ALL_ROOM":509,"STATUS":"\u0e23\u0e49\u0e2d\u0e22\u0e25\u0e30 30 \u0e02\u0e36\u0e49\u0e19\u0e44\u0e1b","Percent_Diff":1.1,"Note":null},{"CHANGWAT_CODE":10,"PRI":"10080000;6\/2568","BRANCH":10080000,"REGIST_NO":"6\/2568","CHANGWAT_Name":"\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e\u0e21\u0e2b\u0e32\u0e19\u0e04\u0e23","BRANCH_Name":"\u0e2a\u0e33\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19\u0e17\u0e35\u0e48\u0e14\u0e34\u0e19\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e\u0e21\u0e2b\u0e32\u0e19\u0e04\u0e23 \u0e2a\u0e32\u0e02\u0e32\u0e2b\u0e49\u0e27\u0e22\u0e02\u0e27\u0e32\u0e07","CONDO_NAME":"\u0e44\u0e2e48\u0e2a\u0e38\u0e17\u0e18\u0e34\u0e2a\u0e32\u0e23\u0e04\u0e2d\u0e19\u0e42\u0e14","ALL_REG":87,"USE_REG":87,"ALL_ROOM":207,"STATUS":"\u0e23\u0e49\u0e2d\u0e22\u0e25\u0e30 30 \u0e02\u0e36\u0e49\u0e19\u0e44\u0e1b","Percent_Diff":2.5,"Note":null},{"CHANGWAT_CODE":60,"PRI":"60000000;1\/2568","BRANCH":60000000,"REGIST_NO":"1\/2568","CHANGWAT_Name":"\u0e19\u0e04\u0e23\u0e2a\u0e27\u0e23\u0e23\u0e04\u0e4c","BRANCH_Name":"\u0e2a\u0e33\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19\u0e17\u0e35\u0e48\u0e14\u0e34\u0e19\u0e08\u0e31\u0e07\u0e2b\u0e27\u0e31\u0e14\u0e19\u0e04\u0e23\u0e2a\u0e27\u0e23\u0e23\u0e04\u0e4c","CONDO_NAME":"\u0e40\u0e2d\u0e2a\u0e40\u0e0b\u0e47\u0e19\u0e17\u0e4c\u0e19\u0e04\u0e23\u0e2a\u0e27\u0e23\u0e23\u0e04\u0e4c","ALL_REG":357,"USE_REG":348,"ALL_ROOM":442,"STATUS":"\u0e23\u0e49\u0e2d\u0e22\u0e25\u0e30 30 \u0e02\u0e36\u0e49\u0e19\u0e44\u0e1b","Percent_Diff":2.98,"Note":null},{"CHANGWAT_CODE":20,"PRI":"20030000;1\/2568","BRANCH":20030000,"REGIST_NO":"1\/2568","CHANGWAT_Name":"\u0e0a\u0e25\u0e1a\u0e38\u0e23\u0e35","BRANCH_Name":"\u0e2a\u0e33\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19\u0e17\u0e35\u0e48\u0e14\u0e34\u0e19\u0e08\u0e31\u0e07\u0e2b\u0e27\u0e31\u0e14\u0e0a\u0e25\u0e1a\u0e38\u0e23\u0e35 \u0e2a\u0e32\u0e02\u0e32\u0e1e\u0e19\u0e31\u0e2a\u0e19\u0e34\u0e04\u0e21","CONDO_NAME":"\u0e01\u0e32\u0e19\u0e15\u0e4c\u0e2a\u0e34\u0e19\u0e35\u0e04\u0e2d\u0e19\u0e42\u0e14\u0e17\u0e32\u0e27\u0e19\u0e4c\u0e0a\u0e25\u0e1a\u0e38\u0e23\u0e35","ALL_REG":35,"USE_REG":35,"ALL_ROOM":62,"STATUS":"\u0e23\u0e49\u0e2d\u0e22\u0e25\u0e30 30 \u0e02\u0e36\u0e49\u0e19\u0e44\u0e1b","Percent_Diff":2.02,"Note":null}];
+        
+        function updateDashboard(filteredData) {
+            document.getElementById('totalCondo').innerText = filteredData.length;
+            document.getElementById('totalReg').innerText = filteredData.reduce((sum, d) => sum + d.ALL_REG, 0);
+            document.getElementById('totalRoom').innerText = filteredData.reduce((sum, d) => sum + d.ALL_ROOM, 0);
+            const highStatus = filteredData.filter(d => d.STATUS === 'ร้อยละ 30 ขึ้นไป');
+            const avg = highStatus.length > 0 ? (highStatus.reduce((sum, d) => sum + d.Percent_Diff, 0) / highStatus.length).toFixed(2) : 0;
+            document.getElementById('avgDiff').innerText = avg + '%';
+        }
+        
+        updateDashboard(data);
+    </script>
+</body>
+</html>
