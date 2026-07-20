@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Condo Price Difference Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet CSS & JS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <!-- Google Fonts: Sarabun -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; }
+        .map-wrapper { width: 100%; height: 480px; position: relative; }
+        #map { width: 100%; height: 480px; border-radius: 0.75rem; z-index: 1; }
+        .table-scroll { height: 480px; max-height: 480px; overflow-y: auto; }
+        .full-table-scroll { max-height: 500px; overflow-y: auto; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .sort-icon { opacity: 0.3; transition: opacity 0.2s; }
+        th:hover .sort-icon { opacity: 1; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased p-4 md:p-6">
+
+    <!-- Header Section & Requirement 4: Time Period -->
+    <header class="mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line text-indigo-600"></i>
+                    Dashboard เปรียบเทียบราคาซื้อขายจดทะเบียนกับราคาประเมินห้องชุด
+                </h1>
+            </div>
+            <!-- Requirement 4: Time Period Banner -->
+            <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 flex items-center gap-3">
+                <div class="bg-indigo-600 text-white p-2.5 rounded-lg"><i class="fa-regular fa-calendar-days text-lg"></i></div>
+                <div>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-indigo-600 block">ช่วงเวลาข้อมูลซื้อขาย</span>
+                    <span class="text-sm font-bold text-slate-800">1 มิถุนายน 2568 ถึง 31 พฤษภาคม 2569</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Requirement 1: Filters Bar (1.1, 1.2, 1.3) -->
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
+        <div class="flex items-center gap-2 mb-3 text-slate-700 font-semibold">
+            <i class="fa-solid fa-filter text-indigo-600"></i><span>ตัวกรองข้อมูล</span>
+            <button onclick="resetFilters()" class="ml-auto text-xs font-normal text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                <i class="fa-solid fa-rotate-left"></i> ล้างตัวกรองทั้งหมด
+            </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">1.1 ตัวกรองจังหวัด</label>
+                <select id="filterProvince" onchange="onProvinceChange()" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500">
+                    <option value="">-- ทั้งหมด (ทุกจังหวัด) --</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">1.2 ตัวกรองสำนักงานที่ดิน</label>
+                <select id="filterBranch" onchange="onFilterChange()" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500">
+                    <option value="">-- ทั้งหมด (ทุกสำนักงานที่ดิน) --</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">1.3 ตัวกรองสถานะ</label>
+                <select id="filterStatus" onchange="onFilterChange()" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500">
+                    <option value="">-- ทั้งหมด (ทุกสถานะ) --</option>
+                    <option value="ร้อยละ 30 ขึ้นไป">ร้อยละ 30 ขึ้นไป</option>
+                    <option value="น้อยกว่าร้อยละ 30">น้อยกว่าร้อยละ 30</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <!-- Cards Section -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-blue-500">
+            <div class="text-sm text-slate-600 font-semibold">จำนวนอาคารชุด</div>
+            <div id="statTotalCondo" class="text-2xl font-bold text-slate-900 mt-2">0</div>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-indigo-500">
+            <div class="text-sm text-slate-600 font-semibold">จำนวนการซื้อขาย</div>
+            <div id="statTotalReg" class="text-2xl font-bold text-indigo-600 mt-2">0</div>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-amber-500">
+            <div class="text-sm text-slate-600 font-semibold">จำนวนห้อง</div>
+            <div id="statTotalRoom" class="text-2xl font-bold text-amber-600 mt-2">0</div>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-emerald-500">
+            <div class="text-sm text-slate-600 font-semibold">อัตราการเปลี่ยนแปลง</div>
+            <div id="statAvgDiff" class="text-2xl font-bold text-emerald-600 mt-2">0.00%</div>
+        </div>
+    </section>
+
+    <!-- Requirement 2 & 3: Map & Top 10 Table -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        
+        <!-- Requirement 2: Thailand Boundary Map -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-map-location-dot text-indigo-600"></i> แผนที่ขอบเขตประเทศไทยตามระดับความแตกต่าง
+                </h2>
+                <span class="text-xs text-slate-400">คลิกขอบเขตจังหวัดบนแผนที่เพื่อกรองข้อมูล</span>
+            </div>
+            <div class="map-wrapper">
+                <div id="map"></div>
+            </div>
+            <div class="mt-3 flex items-center justify-between text-xs text-slate-600 border-t border-slate-100 pt-2">
+                <span>อัตราส่วน (สถานะ &ge;30% & Diff >15%) / อาคารชุดทั้งหมด</span>
+                <div class="flex items-center gap-1">
+                    <span class="inline-block w-3 h-3 rounded" style="background:#fef0d9"></span><span>0%</span>
+                    <span class="inline-block w-3 h-3 rounded ml-2" style="background:#fdcc8a"></span><span>1-10%</span>
+                    <span class="inline-block w-3 h-3 rounded ml-2" style="background:#fc8d59"></span><span>10-25%</span>
+                    <span class="inline-block w-3 h-3 rounded ml-2" style="background:#e34a33"></span><span>25-50%</span>
+                    <span class="inline-block w-3 h-3 rounded ml-2" style="background:#b30000"></span><span>>50%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Requirement 3: Top 10 High Percent_Diff Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-trophy text-amber-500"></i> 10 อันดับอาคารชุดที่มีอัตราส่วนการเปลี่ยนแปลงสูงสุด
+                </h2>
+                <span class="text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full font-medium">เฉพาะสถานะ: ร้อยละ 30 ขึ้นไป</span>
+            </div>
+            <div class="table-scroll border border-slate-100 rounded-lg">
+                <table class="w-full text-sm text-left text-slate-600">
+                    <thead class="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0 z-10">
+                        <tr>
+                            <th scope="col" class="px-2 py-2.5 cursor-pointer hover:bg-slate-200" onclick="sortTable('top10', 'CHANGWAT_Name')">จังหวัด <i class="fa-solid fa-sort sort-icon text-[10px]"></i></th>
+                            <th scope="col" class="px-2 py-2.5 cursor-pointer hover:bg-slate-200" onclick="sortTable('top10', 'BRANCH_Name')">สำนักงานที่ดิน <i class="fa-solid fa-sort sort-icon text-[10px]"></i></th>
+                            <th scope="col" class="px-2 py-2.5 cursor-pointer hover:bg-slate-200" onclick="sortTable('top10', 'CONDO_NAME')">อาคารชุด <i class="fa-solid fa-sort sort-icon text-[10px]"></i></th>
+                            <th scope="col" class="px-2 py-2.5 text-center cursor-pointer hover:bg-slate-200" onclick="sortTable('top10', 'ALL_REG')">จำนวนข้อมูลซื้อขาย <i class="fa-solid fa-sort sort-icon text-[10px]"></i></th>
+                            <th scope="col" class="px-2 py-2.5 text-center cursor-pointer hover:bg-slate-200" onclick="sortTable('top10', 'ALL_ROOM')">จำนวนห้อง <i class="fa-solid fa-sort sort-icon text-[10px]"></i></th>
+                            <th scope="col" class="px-2 py-2.5 text-center">สถานะ</th>
+                            <th scope="col" class="px-2 py-2.5 text-right cursor-pointer hover:bg-slate-200" onclick="sortTable('top10', 'Percent_Diff')">ร้อยละความแตกต่าง <i class="fa-solid fa-sort sort-icon text-[10px]"></i></th>
+                        </tr>
+                    </thead>
+                    <tbody id="top10TableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- Requirement 5: Full Data Table -->
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-database text-indigo-600"></i> ตารางข้อมูลทั้งหมด
+            </h2>
+            <span id="recordCountBadge" class="text-xs font-semibold bg-indigo-50 text-indigo-700 px-3 py-2 rounded-lg border border-indigo-100">0 รายการ</span>
+        </div>
+
+        <div class="full-table-scroll border border-slate-100 rounded-lg">
+            <table class="w-full text-sm text-left text-slate-600">
+                <thead class="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0 z-10">
+                    <tr>
+                        <th scope="col" class="px-4 py-3 cursor-pointer hover:bg-slate-200" onclick="sortTable('full', 'CHANGWAT_Name')">จังหวัด <i class="fa-solid fa-sort sort-icon"></i></th>
+                        <th scope="col" class="px-4 py-3 cursor-pointer hover:bg-slate-200" onclick="sortTable('full', 'BRANCH_Name')">สำนักงานที่ดิน <i class="fa-solid fa-sort sort-icon"></i></th>
+                        <th scope="col" class="px-4 py-3 cursor-pointer hover:bg-slate-200" onclick="sortTable('full', 'CONDO_NAME')">อาคารชุด <i class="fa-solid fa-sort sort-icon"></i></th>
+                        <th scope="col" class="px-4 py-3 text-center cursor-pointer hover:bg-slate-200" onclick="sortTable('full', 'ALL_REG')">จำนวนข้อมูลซื้อขาย <i class="fa-solid fa-sort sort-icon"></i></th>
+                        <th scope="col" class="px-4 py-3 text-center cursor-pointer hover:bg-slate-200" onclick="sortTable('full', 'ALL_ROOM')">จำนวนห้อง <i class="fa-solid fa-sort sort-icon"></i></th>
+                        <th scope="col" class="px-4 py-3 text-center cursor-pointer hover:bg-slate-200" onclick="sortTable('full', 'STATUS')">สถานะ <i class="fa-solid fa-sort sort-icon"></i></th>
+                        <th scope="col" class="px-4 py-3 text-right cursor-pointer hover:bg-slate-200" onclick="sortTable('full', 'Percent_Diff')">ร้อยละความแตกต่าง <i class="fa-solid fa-sort sort-icon"></i></th>
+                    </tr>
+                </thead>
+                <tbody id="fullTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <script>
+        let rawDiffData=[];
+let allCondoData=[];
+const SHEET_ID="13xufUJWYuOY_Md8Bwo1hQUt46Dn7TiYYgsPx8TU5mFY";
+const DIFF_URL=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Diff`;
+const CONDO_URL=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=AllCondoReg`;
+function loadSheet(u){return new Promise((a,b)=>Papa.parse(u,{download:true,header:true,skipEmptyLines:true,complete:r=>a(r.data),error:b}));}
+async function loadData(){
+rawDiffData=(await loadSheet(DIFF_URL)).map(r=>({...r,ALL_REG:+r.ALL_REG||0,ALL_ROOM:+r.ALL_ROOM||0,Percent_Diff:+r.Percent_Diff||0}));
+allCondoData=await loadSheet(CONDO_URL);
+}
+let map, geoJsonLayer;
+        let sortState = { top10: { col: 'Percent_Diff', asc: false }, full: { col: 'Percent_Diff', asc: false } };
+
+        function initMap() {
+            map = L.map('map', { zoomControl: true }).setView([13.0, 101.5], 5);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+
+            fetch('https://raw.githubusercontent.com/apisit/thailand.json/master/thailand.json')
+                .then(res => res.json())
+                .then(data => { renderGeoJsonMap(data); })
+                .catch(err => { console.log('GeoJSON fetch error:', err); });
+        }
+
+        function getColor(ratio) {
+            return ratio > 0.50 ? '#b30000' : ratio > 0.25 ? '#e34a33' : ratio > 0.10 ? '#fc8d59' : ratio > 0.01 ? '#fdcc8a' : '#fef0d9';
+        }
+
+        function getProvRatioMap() {
+            const pFilter = document.getElementById('filterProvince').value;
+            const bFilter = document.getElementById('filterBranch').value;
+            const sFilter = document.getElementById('filterStatus').value;
+
+            const provStats = {};
+            rawDiffData.forEach(item => {
+                if (pFilter && item.CHANGWAT_Name !== pFilter) return;
+                if (bFilter && item.BRANCH_Name !== bFilter) return;
+                if (sFilter && item.STATUS !== sFilter) return;
+
+                const prov = item.CHANGWAT_Name;
+                if (!provStats[prov]) provStats[prov] = { highDiff: 0, totalCondos: 0 };
+                
+                if (item.STATUS === "ร้อยละ 30 ขึ้นไป" && item.Percent_Diff > 15) {
+                    provStats[prov].highDiff += 1;
+                }
+            });
+
+            allCondoData.forEach(item => {
+                if (pFilter && item.CHANGWAT_Name !== pFilter) return;
+                if (bFilter && item.BRANCH_Name !== bFilter) return;
+                const prov = item.CHANGWAT_Name;
+                if (provStats[prov]) provStats[prov].totalCondos += 1;
+            });
+
+            return provStats;
+        }
+
+        function renderGeoJsonMap(geoData) {
+            if (geoJsonLayer) map.removeLayer(geoJsonLayer);
+            const provStats = getProvRatioMap();
+
+            geoJsonLayer = L.geoJson(geoData, {
+                style: function(feature) {
+                    const provName = feature.properties.name || feature.properties.NAME_1 || feature.properties.changwat_th;
+                    const stats = provStats[provName] || { highDiff: 0, totalCondos: 0 };
+                    const ratio = stats.totalCondos > 0 ? (stats.highDiff / stats.totalCondos) : 0;
+                    return { fillColor: getColor(ratio), weight: 1.5, opacity: 1, color: '#ffffff', fillOpacity: 0.75 };
+                },
+                onEachFeature: function(feature, layer) {
+                    const provName = feature.properties.name || feature.properties.NAME_1 || feature.properties.changwat_th;
+                    const stats = provStats[provName] || { highDiff: 0, totalCondos: 0 };
+                    const ratio = stats.totalCondos > 0 ? (stats.highDiff / stats.totalCondos) : 0;
+
+                    layer.bindPopup(`
+                        <div style="font-family:'Sarabun',sans-serif">
+                            <strong style="font-size:14px; color:#1e293b;">จังหวัด ${provName}</strong><br/>
+                            <span style="font-size:12px;">รายการเข้าเงื่อนไข (สถานะ &ge;30% & Diff >15%): <b>${stats.highDiff}</b></span><br/>
+                            <span style="font-size:12px;">อาคารชุดทั้งหมด (Sheet AllCondoReg): <b>${stats.totalCondos}</b></span><br/>
+                            <span style="font-size:12px; color:#e34a33;"><b>อัตราส่วน: ${(ratio * 100).toFixed(1)}%</b></span>
+                        </div>
+                    `);
+
+                    layer.on({
+                        click: function() {
+                            const pSelect = document.getElementById('filterProvince');
+                            for (let option of pSelect.options) {
+                                if (option.value === provName) {
+                                    pSelect.value = provName;
+                                    onProvinceChange();
+                                    break;
+                                }
+                            }
+                        },
+                        mouseover: function(e) { e.target.setStyle({ weight: 3, color: '#3b82f6', fillOpacity: 0.9 }); },
+                        mouseout: function(e) { geoJsonLayer.resetStyle(e.target); }
+                    });
+                }
+            }).addTo(map);
+        }
+
+        function updateMapMarkers() {
+            if (geoJsonLayer) {
+                geoJsonLayer.eachLayer(function(layer) {
+                    const provName = layer.feature.properties.name || layer.feature.properties.NAME_1 || layer.feature.properties.changwat_th;
+                    const provStats = getProvRatioMap();
+                    const stats = provStats[provName] || { highDiff: 0, totalCondos: 0 };
+                    const ratio = stats.totalCondos > 0 ? (stats.highDiff / stats.totalCondos) : 0;
+                    layer.setStyle({ fillColor: getColor(ratio) });
+                });
+            }
+        }
+
+        function populateFilters() {
+            const pSelect = document.getElementById('filterProvince');
+            const provinces = [...new Set(rawDiffData.map(d => d.CHANGWAT_Name))].sort();
+            provinces.forEach(p => pSelect.appendChild(new Option(p, p)));
+            updateBranchDropdown();
+        }
+
+        function updateBranchDropdown() {
+            const pSelect = document.getElementById('filterProvince').value;
+            const bSelect = document.getElementById('filterBranch');
+            bSelect.innerHTML = '<option value="">-- ทั้งหมด (ทุกสำนักงานที่ดิน) --</option>';
+            const branches = [...new Set(rawDiffData.filter(d => !pSelect || d.CHANGWAT_Name === pSelect).map(d => d.BRANCH_Name))].sort();
+            branches.forEach(b => bSelect.appendChild(new Option(b, b)));
+        }
+
+        function onProvinceChange() { updateBranchDropdown(); onFilterChange(); }
+        function resetFilters() {
+            document.getElementById('filterProvince').value = "";
+            document.getElementById('filterBranch').value = "";
+            document.getElementById('filterStatus').value = "";
+            updateBranchDropdown(); onFilterChange();
+        }
+
+        function onFilterChange() {
+            updateKPIs();
+            updateMapMarkers();
+            renderTop10Table();
+            renderFullTable();
+        }
+
+        function getFilteredDiffData() {
+            const pFilter = document.getElementById('filterProvince').value;
+            const bFilter = document.getElementById('filterBranch').value;
+            const sFilter = document.getElementById('filterStatus').value;
+            return rawDiffData.filter(d => 
+                (!pFilter || d.CHANGWAT_Name === pFilter) &&
+                (!bFilter || d.BRANCH_Name === bFilter) &&
+                (!sFilter || d.STATUS === sFilter)
+            );
+        }
+
+        function getFilteredAllCondoData() {
+            const pFilter = document.getElementById('filterProvince').value;
+            const bFilter = document.getElementById('filterBranch').value;
+            return allCondoData.filter(d => 
+                (!pFilter || d.CHANGWAT_Name === pFilter) &&
+                (!bFilter || d.BRANCH_Name === bFilter)
+            );
+        }
+
+        function updateKPIs() {
+            const fDiffData = getFilteredDiffData();
+            const fCondoData = getFilteredAllCondoData();
+
+            // Card 1: จำนวนอาคารชุด = จำนวนข้อมูลทั้งหมดในคอลัมน์ CONDO_NAME ของ sheet AllCondoReg (ตามตัวกรอง)
+            const totalCondo = fCondoData.length;
+            // Card 2: จำนวนการซื้อขาย = ผลรวมของข้อมูลทั้งหมดในคอลัมน์ ALL_REG ของ sheet Diff (ตามตัวกรอง)
+            const totalReg = fDiffData.reduce((sum, d) => sum + d.ALL_REG, 0);
+            // Card 3: จำนวนห้อง = ผลรวมของข้อมูลทั้งหมดในคอลัมน์ ALL_ROOM ของ sheet Diff (ตามตัวกรอง)
+            const totalRoom = fDiffData.reduce((sum, d) => sum + d.ALL_ROOM, 0);
+            // Card 4: อัตราการเปลี่ยนแปลง = ค่าเฉลี่ยของข้อมูลที่มีสถานะ ร้อยละ 30 ขึ้นไป ตามพื้นที่
+            const highStatusData = fDiffData.filter(d => d.STATUS === "ร้อยละ 30 ขึ้นไป");
+            let avgDiff = 0;
+            if (highStatusData.length > 0) {
+                avgDiff = highStatusData.reduce((sum, d) => sum + d.Percent_Diff, 0) / highStatusData.length;
+            }
+
+            document.getElementById('statTotalCondo').textContent = totalCondo.toLocaleString();
+            document.getElementById('statTotalReg').textContent = totalReg.toLocaleString();
+            document.getElementById('statTotalRoom').textContent = totalRoom.toLocaleString();
+            document.getElementById('statAvgDiff').textContent = highStatusData.length > 0 ? avgDiff.toFixed(2) + "%" : "0.00%";
+        }
+
+        function renderTop10Table() {
+            const pFilter = document.getElementById('filterProvince').value;
+            const bFilter = document.getElementById('filterBranch').value;
+
+            let top10Data = rawDiffData.filter(d => d.STATUS === "ร้อยละ 30 ขึ้นไป");
+            if (pFilter) top10Data = top10Data.filter(d => d.CHANGWAT_Name === pFilter);
+            if (bFilter) top10Data = top10Data.filter(d => d.BRANCH_Name === bFilter);
+
+            const { col, asc } = sortState.top10;
+            top10Data.sort((a, b) => {
+                let vA = a[col], vB = b[col];
+                if (typeof vA === 'string') return asc ? vA.localeCompare(vB) : vB.localeCompare(a[col]);
+                return asc ? vA - vB : vB - vA;
+            });
+            top10Data = top10Data.slice(0, 10);
+
+            const tbody = document.getElementById('top10TableBody');
+            tbody.innerHTML = top10Data.map(d => `
+                <tr class="bg-white hover:bg-slate-50 border-b border-slate-100">
+                    <td class="px-2 py-2 font-medium text-slate-900">${d.CHANGWAT_Name}</td>
+                    <td class="px-2 py-2 text-xs text-slate-500">${d.BRANCH_Name}</td>
+                    <td class="px-2 py-2 font-semibold text-indigo-700">${d.CONDO_NAME}</td>
+                    <td class="px-2 py-2 text-center">${d.ALL_REG}</td>
+                    <td class="px-2 py-2 text-center">${d.ALL_ROOM}</td>
+                    <td class="px-2 py-2 text-center"><span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-medium">${d.STATUS}</span></td>
+                    <td class="px-2 py-2 text-right font-bold text-rose-600">${d.Percent_Diff.toFixed(2)}%</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderFullTable() {
+            const fullData = getFilteredDiffData();
+            const { col, asc } = sortState.full;
+            fullData.sort((a, b) => {
+                let vA = a[col], vB = b[col];
+                if (typeof vA === 'string') return asc ? vA.localeCompare(vB) : vB.localeCompare(a[col]);
+                return asc ? vA - vB : vB - vA;
+            });
+
+            document.getElementById('recordCountBadge').textContent = `${fullData.length} รายการ`;
+            const tbody = document.getElementById('fullTableBody');
+            tbody.innerHTML = fullData.map(d => `
+                <tr class="bg-white hover:bg-slate-50 border-b border-slate-100">
+                    <td class="px-4 py-2.5 font-medium text-slate-900">${d.CHANGWAT_Name}</td>
+                    <td class="px-4 py-2.5 text-slate-500">${d.BRANCH_Name}</td>
+                    <td class="px-4 py-2.5 font-medium text-indigo-700">${d.CONDO_NAME}</td>
+                    <td class="px-4 py-2.5 text-center">${d.ALL_REG}</td>
+                    <td class="px-4 py-2.5 text-center">${d.ALL_ROOM}</td>
+                    <td class="px-4 py-2.5 text-center"><span class="${d.STATUS === 'ร้อยละ 30 ขึ้นไป' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'} text-xs px-2.5 py-1 rounded-full font-medium">${d.STATUS}</span></td>
+                    <td class="px-4 py-2.5 text-right font-bold ${d.Percent_Diff > 50 ? 'text-rose-600' : 'text-slate-800'}">${d.Percent_Diff.toFixed(2)}%</td>
+                </tr>
+            `).join('');
+        }
+
+        function sortTable(tableType, col) {
+            const current = sortState[tableType];
+            if (current.col === col) current.asc = !current.asc;
+            else { current.col = col; current.asc = false; }
+            if (tableType === 'top10') renderTop10Table();
+            if (tableType === 'full') renderFullTable();
+        }
+
+        window.onload=async()=>{await loadData();initMap();populateFilters();onFilterChange();};
+    </script>
+</body>
+</html>
