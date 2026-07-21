@@ -198,7 +198,7 @@ let map, geoJsonLayer;
         let sortState = { top10: { col: 'Percent_Diff', asc: false }, full: { col: 'Percent_Diff', asc: false } };
 
         function initMap() {
-            map = L.map('map', { zoomControl: true,minZoom:5,maxZoom:7 }).setView([13.0,101.5],5);
+            map = L.map('map',{zoomControl:true,minZoom:5,maxZoom:5,scrollWheelZoom:false,doubleClickZoom:false}).setView([13.0,101.5],5);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
 
             fetch('https://raw.githubusercontent.com/apisit/thailand.json/master/thailand.json')
@@ -226,7 +226,7 @@ let map, geoJsonLayer;
                 if (!provStats[prov]) provStats[prov] = { highDiff: 0, totalCondos: 0 };
                 
                 if (item.STATUS === "ข้อมูลซื้อขายตามเกณฑ์ร้อยละ 30" && item.Percent_Diff >= 15) {
-                    provStats[prov].highDiff += 1;
+                    if(!provStats[prov].highSet) provStats[prov].highSet=new Set(); provStats[prov].highSet.add(item.CONDO_NAME);
                 }
             });
 
@@ -234,9 +234,10 @@ let map, geoJsonLayer;
                 if (pFilter && item.CHANGWAT_Name !== pFilter) return;
                 if (bFilter && item.BRANCH_Name !== bFilter) return;
                 const prov = item.CHANGWAT_Name;
-                if (provStats[prov]) provStats[prov].totalCondos += 1;
+                if(provStats[prov]){ if(!provStats[prov].condoSet) provStats[prov].condoSet=new Set(); provStats[prov].condoSet.add(item.CONDO_NAME);}
             });
 
+            Object.values(provStats).forEach(s=>{s.highDiff=s.highSet? s.highSet.size:0; s.totalCondos=s.condoSet? s.condoSet.size:0;});
             return provStats;
         }
 
@@ -350,7 +351,7 @@ let map, geoJsonLayer;
             const fCondoData = getFilteredAllCondoData();
 
             // Card 1: จำนวนอาคารชุด = จำนวนข้อมูลทั้งหมดในคอลัมน์ CONDO_NAME ของ sheet AllCondoReg (ตามตัวกรอง)
-            const totalCondo = fCondoData.length;
+            const totalCondo = new Set(fCondoData.map(x=>x.CONDO_NAME)).size;
             // Card 2: จำนวนการซื้อขาย = ผลรวมของข้อมูลทั้งหมดในคอลัมน์ ALL_REG ของ sheet Diff (ตามตัวกรอง)
             const totalReg = fDiffData.reduce((sum, d) => sum + d.ALL_REG, 0);
             // Card 3: จำนวนห้อง = ผลรวมของข้อมูลทั้งหมดในคอลัมน์ ALL_ROOM ของ sheet Diff (ตามตัวกรอง)
